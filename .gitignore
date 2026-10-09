@@ -1,0 +1,24 @@
+# Your interns' working files never go in git. Memory is private, logs are noise.
+agents/*/memory/*.md
+!agents/*/memory/MEMORY.md
+!agents/*/memory/questions.md
+!agents/*/memory/log.md
+agents/*/out/
+team/inbox/*/
+team/status/*
+!team/status/.gitkeep
+team/logs/
+logs/
+**/.claude/settings.local.json
+team/.send-ok.json
+team/.tick.lock
+team/team.json
+*.pyc
+__pycache__/
+.DS_Store
+.env
+*.key
+*.pem
+/bin/
+team/.approvals.json*
+team/.send-ok.json.tmp

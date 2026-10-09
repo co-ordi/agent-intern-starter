@@ -1,0 +1,16 @@
+{
+  "_comment": "Arthur's categorising rules. First match wins, so put the specific ones first. A match is a whole word or phrase in the description, case doesn't matter. kind is income, cost, tax, transfer or drawings. sign (optional) is in or out: a rule with sign only matches money moving that way. Add a rule whenever Arthur asks you about a new merchant.",
+  "rules": [
+    {"category": "Client income",              "kind": "income",   "sign": "in",  "match": ["INVOICE", "INV", "PAYMENT FROM", "STRIPE PAYOUT", "GOCARDLESS", "PAYPAL TRANSFER"]},
+    {"category": "Tax payments",               "kind": "tax",                     "match": ["HMRC", "IRS", "COMPANIES HOUSE"]},
+    {"category": "Transfers between accounts", "kind": "transfer",                "match": ["TRANSFER", "TO SAVINGS", "FROM SAVINGS", "POT", "VAULT"]},
+    {"category": "Salary and drawings",        "kind": "drawings", "sign": "out", "match": ["SALARY", "DRAWINGS", "DIVIDEND"]},
+    {"category": "Meals and coffee",           "kind": "cost",     "sign": "out", "match": ["COFFEE", "CAFE", "PRET", "STARBUCKS", "COSTA", "DELIVEROO", "UBER EATS", "JUST EAT", "RESTAURANT"]},
+    {"category": "Software and subscriptions", "kind": "cost",     "sign": "out", "match": ["GOOGLE", "MICROSOFT", "ADOBE", "SLACK", "NOTION", "ANTHROPIC", "OPENAI", "GITHUB", "CANVA", "ZOOM", "XERO", "QUICKBOOKS", "FIGMA", "DROPBOX"]},
+    {"category": "Travel",                     "kind": "cost",     "sign": "out", "match": ["TFL", "TRAINLINE", "UBER", "BOLT", "LNER", "GWR", "AIRWAYS", "RYANAIR", "EASYJET", "NATIONAL RAIL", "PARKING"]},
+    {"category": "Office and equipment",       "kind": "cost",     "sign": "out", "match": ["AMAZON", "APPLE STORE", "CURRYS", "IKEA", "STAPLES", "ARGOS"]},
+    {"category": "Phone and internet",         "kind": "cost",     "sign": "out", "match": ["VODAFONE", "EE", "O2", "THREE", "BT", "SKY", "VIRGIN MEDIA"]},
+    {"category": "Professional fees",          "kind": "cost",     "sign": "out", "match": ["ACCOUNTANT", "SOLICITOR", "INSURANCE"]},
+    {"category": "Bank fees",                  "kind": "cost",     "sign": "out", "match": ["FEE", "MONTHLY CHARGE", "OVERDRAFT INTEREST"]}
+  ]
+}

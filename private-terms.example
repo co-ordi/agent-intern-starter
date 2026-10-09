@@ -1,0 +1,8 @@
+# Copy this to ~/.agent-team-private-terms (outside the repo) and add your own: one term per line, case-insensitive.
+# check_private.py fails a commit that contains any of them. Short terms (5 characters or fewer) match whole words only.
+Acme Ltd
+Jo Bloggs
+jo@acme.example
+acme-internal.example
+#acme-channel
+£12,345

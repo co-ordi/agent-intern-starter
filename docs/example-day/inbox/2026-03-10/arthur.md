@@ -1,0 +1,3 @@
+- New statement picked up and categorised; two merchants to check when you have a minute (in the money file).
+- One invoice is 9 days past its terms (Wingtip Coffee). A friendly chaser is drafted for /chase.
+- Nothing needs a decision today.

@@ -1,0 +1,1 @@
+- #1 ✓ done 16:40: outline drafted on the board, three options priced from the pricing document; Alex to review Thursday

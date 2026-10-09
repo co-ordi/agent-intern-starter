@@ -1,0 +1,8 @@
+{
+  "date": "2026-03-10",
+  "orders": [
+    {"id": 1, "to": "ella", "do": "Draft the Northwind outline from last week's call notes, ready by Thursday noon", "why": "Sam needs something for the board by Friday", "at": "08:30"},
+    {"id": 2, "to": "arthur", "do": "Prepare the Wingtip Coffee chaser card for sign-off", "why": "9 days past terms", "at": "08:30"},
+    {"id": 3, "to": "chris", "do": "Turn the 'something for the board' question into Thursday's post", "why": "third prospect to ask this month", "at": "08:30"}
+  ]
+}

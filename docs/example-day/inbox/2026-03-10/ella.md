@@ -1,0 +1,3 @@
+- 09:00 Reply to Sam at Northwind: draft card waiting for your sign-off (he wants something for the board by Friday).
+- 10:00 Ten calls from today's sheet; Fabrikam and Contoso Dental first.
+- Tailspin Toys said not this quarter: on hold until 1 June, nothing for you to do.

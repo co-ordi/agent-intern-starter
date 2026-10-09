@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/../../team/bin/boot.py\" ella"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/../../team/bin/guard.py\" ella"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "mcp__*__send_message",
+      "mcp__*__send_email",
+      "mcp__*__reply",
+      "mcp__*__forward",
+      "mcp__*__delete_*",
+      "mcp__*__trash_*",
+      "mcp__*__batch_delete_*",
+      "mcp__*__create_payment",
+      "mcp__*__initiate_payment",
+      "mcp__*__make_payment",
+      "mcp__*__add_reaction",
+      "mcp__*__slack_add_reaction",
+      "mcp__*__addReaction",
+      "mcp__*__remove_reaction",
+      "mcp__*__removeReaction",
+      "mcp__*__react",
+      "mcp__*__sendMail",
+      "mcp__*__sendEmail",
+      "mcp__*__sendMessage",
+      "mcp__*__send-email",
+      "mcp__*__send_mail",
+      "mcp__*__reply_*",
+      "mcp__*__replyAll",
+      "mcp__*__forward_*"
+    ]
+  }
+}

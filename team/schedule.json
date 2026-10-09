@@ -1,0 +1,16 @@
+{
+  "_comment": "Local times in your team's timezone (team.json). tick.py runs what is due once a minute from cron. Days: Mon-Fri, Sat, Mon,Wed, or daily. Add a model field to a job to run it on a smaller, cheaper model (passed to claude -p --model).",
+  "jobs": [
+    {"id": "ella-morning",   "agent": "ella",   "at": "08:15", "days": "Mon-Fri", "prompt": "/today", "timeout_min": 15},
+    {"id": "chris-morning",  "agent": "chris",  "at": "08:15", "days": "Mon-Fri", "prompt": "/post", "timeout_min": 10},
+    {"id": "theo-brief",     "agent": "theo",   "at": "08:30", "days": "Mon-Fri", "prompt": "/brief", "timeout_min": 10},
+    {"id": "arthur-books",   "agent": "arthur", "at": "07:45", "days": "Tue-Fri", "prompt": "/books", "timeout_min": 10},
+    {"id": "arthur-pulse",   "agent": "arthur", "at": "08:45", "days": "Mon",     "prompt": "/pulse", "timeout_min": 10},
+    {"id": "ella-evening",   "agent": "ella",   "at": "19:00", "days": "Sun-Fri", "prompt": "/today tomorrow", "timeout_min": 20},
+    {"id": "theo-health",    "agent": "theo",   "at": "19:30", "days": "daily",   "prompt": "/health", "timeout_min": 5},
+    {"id": "chris-score",    "agent": "chris",  "at": "17:00", "days": "Fri",     "prompt": "/score", "timeout_min": 10},
+    {"id": "ella-review",    "agent": "ella",   "at": "17:10", "days": "Fri", "prompt": "Friday review: score the week against your numbers, tidy memory/MEMORY.md and update PLAYBOOK.md with the evidence (../../team/TEAM.md).", "timeout_min": 10},
+    {"id": "arthur-review",  "agent": "arthur", "at": "17:20", "days": "Fri", "prompt": "Friday review: score the week against your numbers, tidy memory/MEMORY.md and update PLAYBOOK.md with the evidence (../../team/TEAM.md).", "timeout_min": 10},
+    {"id": "theo-review",    "agent": "theo",   "at": "17:30", "days": "Fri", "prompt": "Friday review: read the other interns' reviews in today's notes, score the week against the goal, tidy memory/MEMORY.md and update PLAYBOOK.md with the evidence (../../team/TEAM.md).", "timeout_min": 15}
+  ]
+}

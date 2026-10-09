@@ -1,0 +1,3 @@
+- Northwind signed: handover written for the head intern (handover-northwind.md).
+- For finance: the first invoice is due now, terms and PO number in the handover's money line.
+- Lena Park (their IT lead) needs the security answers before Thursday's kick-off: drafting them today.

@@ -37,6 +37,14 @@ explains what it touches. Once you're happy, it installs everything and opens th
 
 Run the tests any time: `python3 -m unittest`
 
+### Start with one intern
+
+Prefer to try one before the whole team? Tell the head intern when he interviews you: he asks only what that intern
+needs, connects only its tools and leaves the others switched off. Ella (sales) or Arthur (money) are the easiest
+to judge in a week. Run it by hand for that week, no scheduling: open it each morning (`python3 team/bin/open.py
+ella`, then `/today`, or `arthur` and `/books` with a fresh statement). When it's earning its place, open Theo and
+say "add the team".
+
 ### Which AI coding tool
 
 The interns are folders of Markdown and small Python scripts, so any tool that can read files and run commands can
@@ -50,10 +58,21 @@ What's enforced where, honestly:
 
 - **Everywhere.** The scripts themselves never send an email, delete anything or move money. `approvals.py` holds
   every draft until you sign it off, and only two scripts touch the internet, once you set them up: `slack.py`
-  (your own private channel) and the finance intern's read-only bank client.
-- **In Claude Code, also by hooks.** The guard (`team/bin/guard.py`) runs before every tool call and blocks sends,
-  deletes, payments, secrets in commands and anyone signing off for you, and each intern's deny list switches off
-  the tools it must never have.
+  (your own private channel) and the finance intern's read-only bank client. `install.py` makes the guard
+  (`team/bin/`) and every intern's `.claude/settings*.json` read-only at the OS level, so not even code an intern
+  writes can change them. To edit them yourself, or to `git pull` an update, run `python3 install.py --unlock` in
+  your own terminal; running `install.py` again locks them.
+- **Your sign-off key.** On a Mac it lives in your keychain and every use asks for your Mac password. Elsewhere it's
+  a file locked with a passphrase you choose at your first sign-off and type at each one, so a script that reads the
+  file gets nothing it can sign with.
+- **In Claude Code, also by hooks.** The guard (`team/bin/guard.py`) runs before every tool call. It blocks sends,
+  deletes of any kind (rm, find -delete, Python's rmtree and remove), payments, secrets in commands, changes to the
+  guard or the settings, and anyone signing off for you. It also checks what an intern writes before it lands, so
+  a script can't carry what a command couldn't, and scheduled runs can't send data to any API. Each intern's deny
+  list switches off the tools it must never have.
+- **What no pattern can promise.** The guard matches patterns, so deliberately disguised code can still get past
+  it. That's why the protected files are read-only and terminal sign-offs are signed. For hard isolation, run the
+  interns under a separate OS user or in a container.
 - **In other tools, as written rules.** Without hooks, the guard's rules are in each intern's brief and the
   interns follow them, but nothing stops a tool call. So `tick.py` only starts the send run for a signed-off card
   under Claude Code; with another tool the card waits in the morning report for you to send. Give interns in other
@@ -130,7 +149,8 @@ In this version the interns run on your own computer, so they work while it's on
   `team/team.json`), with a time limit. It may use its own folder, the team notes and scripts, and the tools you
   connected in the interview (`"allow"` in `team/team.json`). Nothing else.
 - **Stricter rules when nobody's watching.** Scheduled runs are marked as such, and the guard then blocks every send
-  except a card you've signed off, every delete, calendar invites, posting as you and git push.
+  except a card you've signed off, every delete, calendar invites, posting as you, git push and sending data to
+  any API.
 - **A health check.** Each evening the head intern reads every job's status, re-runs what failed and tells you only
   what changes your day.
 - **A budget.** Every run uses your AI plan or API credit. Give simple jobs a cheaper model with `"model"` in
@@ -192,8 +212,8 @@ those without extra permission.
 | **Marketing**<br>(Chris) | Your past posts, analytics, the brand kit | Post drafts, the calendar, images | Posting as you, sending, deleting, naming a private client |
 | **Finance**<br>(Arthur) | Bank statements (a CSV export, or optionally a read-only bank connection), invoices, the ledger | The ledger, the forecast, invoice and chase drafts | Moving money, sending, deleting, figures in a shared channel |
 
-Enforced in code: sends, deletes, payments, raw email APIs, secrets in commands and anyone signing off on your
-behalf, through the guard and each intern's deny list. Written rules the interns follow (and you see in their
+Enforced in code: sends, deletes, payments, raw email APIs, secrets in commands, changes to the guard and anyone
+signing off on your behalf, through the guard, each intern's deny list and the read-only files `install.py` locks. Written rules the interns follow (and you see in their
 drafts): prices only from the pricing document, private clients unnamed, no figures in shared places. Details, and
 how to wire your own tools, are in [docs/tools.md](docs/tools.md).
 
@@ -284,6 +304,8 @@ tests/                unittest, stdlib only: python3 -m unittest discover tests
 - **Voice.** `team/voice/VOICE.md` starts from the emails you paste in the interview, then your edits teach it.
 - **Tools.** Start with what you already pay for: calendar, inbox, CRM and a bank statement export. Theo connects
   them with you in the interview. See [docs/connect-tools.md](docs/connect-tools.md).
+- **The guard and the settings.** They're read-only once installed. `python3 install.py --unlock` in your own
+  terminal lets you change them; `python3 install.py --lock` (or any install run) locks them again.
 - **The board.** One place that is the truth. See [integrations/dashboard.md](integrations/dashboard.md).
 - **A channel.** Optional, and it puts the report and your sign-offs on your phone. See
   [integrations/messaging.md](integrations/messaging.md).
@@ -348,6 +370,8 @@ free and MIT-licensed, and TrueLayer's sandbox is free (check their pricing befo
   where it stopped.
 - **A scheduled run says a tool was denied.** Add the tool's name to `"allow"` in `team/team.json`. Reads and drafts
   only: the guard blocks sends, deletes and payments whatever that list says.
+- **"Permission denied" editing `team/bin/` or a settings file, or on `git pull`.** They're locked on purpose. Run
+  `python3 install.py --unlock` in your own terminal, make the change or pull, then `python3 install.py --lock`.
 - **Your AI tool isn't found.** Install it, or set `"tool"` and `"runner"` in `team/team.json`.
 - **The bank connection says it isn't connected.** Run `truelayer.py link` and `connect <code>` in the same mode as
   the pull (sandbox, or `--live` for both).

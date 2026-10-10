@@ -45,6 +45,13 @@ def load_schedule(path=None):
         return []
 
 
+def is_active(agent):
+    """Only the interns you've switched on run: "active" in team.json lists them when you start with one (the
+    head intern's interview sets it). With no list, everyone runs."""
+    active = common.load_config().get("active")
+    return not active or agent in active
+
+
 def day_matches(spec, weekday):
     """'Mon-Fri', 'Sat', 'Mon,Wed,Fri' or 'daily' against a weekday index (Mon=0)."""
     spec = (spec or "daily").strip()
@@ -209,7 +216,8 @@ def main(argv):
     if "--list" in argv:
         for j in jobs:
             n = next_run(j, when)
-            print(f"{j['id']:<22} {j['agent']:<10} {j['at']} {j.get('days', 'daily'):<8} next {n:%a %H:%M}" if n else j["id"])
+            line = f"{j['id']:<22} {j['agent']:<10} {j['at']} {j.get('days', 'daily'):<8} next {n:%a %H:%M}" if n else j["id"]
+            print(line if is_active(j["agent"]) else f"{line}  (paused: not switched on yet)")
         return
     if "--run" in argv:
         jid = argv[argv.index("--run") + 1]
@@ -220,7 +228,7 @@ def main(argv):
         print(line)
     done = ran_today(when)
     for j in jobs:
-        if due(j, when, done):
+        if is_active(j["agent"]) and due(j, when, done):
             print(run_job(j, when, dry="--dry" in argv))
 
 
@@ -261,6 +269,13 @@ def test():
     ok = ok and c[c.index("--allowedTools") + 1].split(",") == ALLOW + ["mcp__mail__create_draft", "WebSearch"]
     o = command(dict(job, agent=common.orchestrator()))
     ok = ok and o[o.index("--allowedTools") + 1].endswith(f",Read(/{common.AGENTS}/**)")
+    # starting with one intern: only the interns switched on in team.json run; with no list, everyone does
+    with open(common.CONFIG, "w") as f:
+        json.dump({"active": ["ella"]}, f)
+    ok = ok and is_active("ella") and not is_active("arthur")
+    with open(common.CONFIG, "w") as f:
+        json.dump({}, f)
+    ok = ok and is_active("arthur")
     for run, want in (("codex exec", ["codex", "exec", "/today"]), ("gemini -p", ["gemini", "-p", "/today"])):
         with open(common.CONFIG, "w") as f:
             json.dump({"runner": run}, f)

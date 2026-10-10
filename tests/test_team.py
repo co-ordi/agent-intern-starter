@@ -269,7 +269,8 @@ class Install(unittest.TestCase):
                 self.assertFalse([d for d in deny if "send" in d or "reply" in d], deny)
 
     def test_skill_paths_resolve_from_the_agent_folder(self):
-        """Skills, AGENT.md and OPERATING.md run inside agents/<name>/, so every team path must be ../../team/."""
+        """Skills, AGENT.md and OPERATING.md run inside agents/<name>/, so every team path must be ../../team/. Lines
+        quoted with > are what the intern shows the human, who works from the repo root, so they keep team/."""
         import re
         for a in ("theo", "ella", "chris", "arthur"):
             folder = os.path.join(ROOT, "agents", a)
@@ -279,7 +280,8 @@ class Install(unittest.TestCase):
             for path in files:
                 with open(path, encoding="utf-8") as fh:
                     text = fh.read()
-                bare = re.findall(r"(?<![./\w])team/(?:bin|inbox|status|voice|TEAM|schedule)", text)
+                own = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(">"))
+                bare = re.findall(r"(?<![./\w])team/(?:bin|inbox|status|voice|TEAM|schedule)", own)
                 self.assertEqual(bare, [], f"{path}: use ../../team/")
                 for ref in re.findall(r"\.\./\.\./team/(?:bin/\w+\.py|TEAM\.md|schedule\.json|voice/\w+\.md)", text):
                     self.assertTrue(os.path.exists(os.path.normpath(os.path.join(folder, ref))), f"{path}: {ref}")
@@ -357,6 +359,97 @@ class Install(unittest.TestCase):
         self.assertNotIn("agents/*/out/", missing)
         self.assertIn("agents/*/memory/*.md", missing)
         self.assertEqual(install.ensure_gitignore(path), [])
+
+
+class LockedGuard(unittest.TestCase):
+    """install.py makes team/bin/ and the interns' settings read-only; only you unlock them, in your own terminal."""
+
+    def setUp(self):
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("the superuser can write read-only files")
+        import shutil
+        self.copy = os.path.join(tempfile.mkdtemp(), "repo")
+        shutil.copytree(ROOT, self.copy, ignore=shutil.ignore_patterns(".git", "__pycache__", "logs", "images", "status"))
+        self.env = {k: v for k, v in os.environ.items() if k not in ("TEAM_AGENT", "TEAM_RUN", "CLAUDECODE",
+                    "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX", "CODEX_MANAGED_BY_NPM", "GEMINI_CLI", "CURSOR_TRACE_ID")}
+
+    def tearDown(self):
+        import shutil
+        self.run_install("--unlock")
+        shutil.rmtree(os.path.dirname(self.copy), ignore_errors=True)
+
+    def run_install(self, *args, env=None):
+        return subprocess.run([sys.executable, os.path.join(self.copy, "install.py"), *args], capture_output=True,
+                              text=True, stdin=subprocess.DEVNULL, env=env or self.env)
+
+    def writable(self, *parts):
+        return os.access(os.path.join(self.copy, *parts), os.W_OK)
+
+    def test_install_locks_and_only_you_unlock(self):
+        r = self.run_install("--yes", "--owner", "Sam")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("docs/first-day.md", r.stdout)          # the final message points at the first day too
+        self.assertIn("team/bin/open.py", r.stdout)
+        self.assertIn("install.py --unlock", r.stdout)
+        guard_py = os.path.join(self.copy, "team", "bin", "guard.py")
+        self.assertFalse(self.writable("team", "bin", "guard.py"))
+        self.assertFalse(self.writable("team", "bin"))       # nothing in it can be renamed, deleted or added
+        self.assertFalse(self.writable("agents", "ella", ".claude", "settings.json"))
+        self.assertTrue(self.writable("agents", "ella", "memory", "MEMORY.md"))
+        self.assertTrue(self.writable("agents", "ella", ".claude", "skills", "today", "SKILL.md"))
+        with self.assertRaises(PermissionError):
+            open(guard_py, "w").close()
+        with self.assertRaises(PermissionError):
+            os.rename(guard_py, guard_py + ".old")
+        refused = self.run_install("--unlock", env=dict(self.env, CLAUDECODE="1"))   # inside an AI tool: no
+        self.assertEqual(refused.returncode, 1)
+        self.assertFalse(self.writable("team", "bin", "guard.py"))
+        self.assertEqual(self.run_install("--unlock").returncode, 0)
+        self.assertTrue(self.writable("team", "bin", "guard.py") and self.writable("team", "bin"))
+        self.assertEqual(self.run_install("--lock").returncode, 0)
+        self.assertFalse(self.writable("agents", "theo", ".claude", "settings.json"))
+        # a re-run fills the settings (they're unlocked for it) and locks them again
+        r = self.run_install("--yes", "--names", "Max,Ella,Chris,Arthur")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with open(os.path.join(self.copy, "agents", "max", ".claude", "settings.json")) as f:
+            self.assertIn("boot.py\\\" max", f.read())
+        self.assertFalse(self.writable("agents", "max", ".claude", "settings.json"))
+
+
+class Onboarding(unittest.TestCase):
+    def read(self, *parts):
+        with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
+            return f.read()
+
+    def test_whole_team_or_one_intern(self):
+        skill = self.read("agents", "theo", ".claude", "skills", "onboard", "SKILL.md")
+        self.assertIn("the whole team, or one intern", skill)
+        self.assertIn('"active"', skill)
+        self.assertIn("### Start with one intern", self.read("README.md"))
+
+    def test_finish_explains_how_the_team_works(self):
+        skill = self.read("agents", "theo", ".claude", "skills", "onboard", "SKILL.md")
+        finish = skill[skill.index("## Finish: how your team works"):]
+        for must in ("team/bin/open.py", "up to speed", "report.md", "at <time>", "cards.md", "approvals.py approve",
+                     "Nothing leaves without that sign-off", "Running on their own", "Still missing", "Tomorrow morning"):
+            self.assertIn(must, finish)
+        self.assertLess(len([line for line in finish.splitlines() if line.startswith(">")]), 16)   # one screen
+
+
+class EnforcedWhere(unittest.TestCase):
+    """The docs say what the code enforces, and the limit it can't beat."""
+
+    def test_docs_match_the_code(self):
+        with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as f:
+            readme = f.read()
+        with open(os.path.join(ROOT, "AGENTS.md"), encoding="utf-8") as f:
+            agents = f.read()
+        for text in (readme, agents, guard.__doc__):
+            self.assertIn("install.py --unlock", text, "--unlock documented")
+        self.assertIn("deliberately disguised code can still get past", " ".join(readme.split()), "README limit")
+        self.assertIn("Known limit: this is pattern matching", guard.__doc__)
+        self.assertIn("passphrase", readme)
+        self.assertNotIn("there the guard is the only thing between an intern and that key", agents)
 
 
 if __name__ == "__main__":

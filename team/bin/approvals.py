@@ -22,7 +22,9 @@ Agents can't approve on your behalf, and the code checks it rather than trusting
     on the card, from your own account). A terminal sign-off carries an RSA signature (openssl). The private key
     lives in your macOS keychain with no trusted apps, so every read asks for your Mac password (click Allow, never
     Always Allow); the public half (~/.config/agent-interns/signoff.pub) is all the send run needs, so scheduled
-    sends never wait on a prompt. Off macOS the private key is a file only your user can read.
+    sends never wait on a prompt. Off macOS the private key is a file only your user can read, encrypted with a
+    passphrase you choose at your first sign-off and type at every one after, so a script that reads the file gets
+    nothing it can sign with.
   - `approve` only works in your own terminal: it needs an interactive terminal, refuses to run inside an AI tool
     (TEAM_AGENT, TEAM_RUN, CLAUDECODE and similar markers), and asks you to type back a code it shows only there.
     No code is written to the card, cards.md or the state file.
@@ -62,7 +64,7 @@ OPEN = ("waiting", "clock")
 SIGNED = ("clock", "locked", "sending")
 KEY_SERVICE = "agent-interns-signing-key"   # the guard blocks any intern command that mentions agent-interns
 KEY_DIR = os.path.join(os.path.expanduser("~"), ".config", "agent-interns")
-KEY_FILE = os.path.join(KEY_DIR, "signoff.key")   # the private key, off macOS only
+KEY_FILE = os.path.join(KEY_DIR, "signoff.key")   # the private key, off macOS only, encrypted with your passphrase
 PUB_FILE = os.path.join(KEY_DIR, "signoff.pub")   # the public half: checks a signature, can't make one
 AGENT_MARKERS = ("TEAM_AGENT", "TEAM_RUN", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX",
                  "CODEX_MANAGED_BY_NPM", "GEMINI_CLI", "CURSOR_TRACE_ID")
@@ -103,9 +105,20 @@ def _on_keychain():
     return sys.platform == "darwin" and bool(shutil.which("security"))
 
 
-def _private_key(create=False):
+def _with_key_file(priv, fn):
+    """Run fn(path) with the key in a temporary file only your user can read (it's encrypted off macOS)."""
+    with tempfile.TemporaryDirectory() as d:
+        k = os.path.join(d, "k")
+        fd = os.open(k, os.O_WRONLY | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(priv)
+        return fn(d, k)
+
+
+def _private_key(create=False, passphrase=None):
     """The key that makes terminal sign-offs. macOS: your login keychain, created with an empty trusted-apps list
-    (-T ""), so every read asks for your Mac password. Elsewhere: a file only your user can read."""
+    (-T ""), so every read asks for your Mac password. Elsewhere: a file only your user can read, encrypted with
+    your passphrase (AES-256, PKCS#8), which you type at each sign-off. An older unencrypted key file is replaced."""
     if _test_keys:
         return _test_keys[0]
     if _on_keychain():
@@ -116,13 +129,24 @@ def _private_key(create=False):
     else:
         try:
             with open(KEY_FILE, "rb") as f:
-                return f.read() or None
+                data = f.read()
+            if b"ENCRYPTED" in data:
+                return data
         except OSError:
             pass
     if not create:
         return None
-    priv = _openssl("genrsa", "2048")
-    pub = priv and _openssl("rsa", "-pubout", stdin=priv)
+    if _on_keychain():
+        priv = _openssl("genrsa", "2048")
+        pub = priv and _openssl("rsa", "-pubout", stdin=priv)
+    else:
+        if not passphrase:
+            return None
+        pw = (passphrase + "\n").encode()
+        priv = _openssl("genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048", "-aes-256-cbc",
+                        "-pass", "stdin", stdin=pw)
+        pub = priv and _with_key_file(priv, lambda d, k: _openssl("pkey", "-in", k, "-passin", "stdin", "-pubout",
+                                                                   stdin=pw))
     if not pub:
         return None
     os.makedirs(KEY_DIR, mode=0o700, exist_ok=True)
@@ -154,12 +178,16 @@ def _message(cid, c):
     return f"{cid}|{c['fp']}|{c['version']}|{c['thumbed_at']}".encode()
 
 
-def _sign(priv, msg):
-    with tempfile.TemporaryDirectory() as d:
+def _sign(priv, msg, passphrase=None):
+    """A signature over msg, or "" if the key can't be used (an encrypted key with no passphrase, or the wrong one)."""
+    def run(d, k):
         m = os.path.join(d, "m")
         with open(m, "wb") as f:
             f.write(msg)
-        sig = _openssl("dgst", "-sha256", "-sign", "/dev/stdin", m, stdin=priv)
+        if b"ENCRYPTED" in priv:   # the passphrase goes on stdin, never on the command line
+            return _openssl("dgst", "-sha256", "-sign", k, "-passin", "stdin", m, stdin=((passphrase or "") + "\n").encode())
+        return _openssl("dgst", "-sha256", "-sign", k, m)
+    sig = _with_key_file(priv, run)
     return sig.hex() if sig else ""
 
 
@@ -242,10 +270,22 @@ def _record(cid, up=True, at=None, via="channel", sign=None):
     return True
 
 
-def approve(cid, up=True, answer=None, at=None):
+def _ask_passphrase(new):
+    import getpass
+    if not new:
+        return getpass.getpass("Your sign-off passphrase: ")
+    print("First sign-off on this computer: choose a passphrase (12 characters or more; four random words is good).\n"
+          "You'll type it at every sign-off. It never leaves this computer, and nobody can recover it.")
+    first = getpass.getpass("New sign-off passphrase: ")
+    if len(first) < 12 or getpass.getpass("Once more: ") != first:
+        return None
+    return first
+
+
+def approve(cid, up=True, answer=None, at=None, passphrase=None):
     """Your sign-off from your own terminal. Refuses inside an AI tool or without an interactive terminal, shows a
     fresh code you type back (answer(code) stands in for you in the tests), then signs with your private key, which
-    on macOS asks for your Mac password."""
+    on macOS asks for your Mac password and elsewhere for your sign-off passphrase (passphrase(new) stands in)."""
     if not (human_terminal() or _test_keys):
         return "refused: sign-offs only come from your own terminal (or your reaction on the card), never an intern"
     c = _load().get(cid)
@@ -257,10 +297,20 @@ def approve(cid, up=True, answer=None, at=None):
     ask = answer or (lambda shown: input(f"Send '{c['subject']}' to {c['to']}? Type {shown} to confirm: "))
     if ask(code).strip().lower() != code:
         return "refused: the code didn't match"
-    priv = _private_key(create=True)
+    pw = None
+    if not (_test_keys or _on_keychain()):
+        existing = _private_key()
+        pw = (passphrase or _ask_passphrase)(not existing)
+        if not pw:
+            return "refused: no passphrase (12 characters or more, typed the same twice)"
+        priv = existing or _private_key(create=True, passphrase=pw)
+    else:
+        priv = _private_key(create=True)
     if not priv:
         return "refused: no signing key (it needs openssl; on a Mac, click Allow when it asks for your password)"
-    return "ok" if _record(cid, True, at=at, via="terminal", sign=lambda m: _sign(priv, m)) else "no open card with that id"
+    if not _sign(priv, b"check", pw):
+        return "refused: that passphrase doesn't open your sign-off key"
+    return "ok" if _record(cid, True, at=at, via="terminal", sign=lambda m: _sign(priv, m, pw)) else "no open card with that id"
 
 
 def ready(now=None):
@@ -430,6 +480,25 @@ def test():
     card("chris", "d5", "x@y.com", "S", "B2", card_id=c5, poster=lambda text: "302.1")
     checks.append(("new version resets", _load()[c5]["state"] == "waiting" and _load()[c5]["version"] == 2))
     _test_keys = None
+    # off macOS: the key file is encrypted, signs only with your passphrase, and a wrong one signs nothing
+    global KEY_DIR, KEY_FILE, PUB_FILE, _on_keychain
+    saved_paths, saved_keychain = (KEY_DIR, KEY_FILE, PUB_FILE), _on_keychain
+    KEY_DIR = tempfile.mkdtemp()
+    KEY_FILE, PUB_FILE = os.path.join(KEY_DIR, "signoff.key"), os.path.join(KEY_DIR, "signoff.pub")
+    _on_keychain = lambda: False  # noqa: E731
+    priv = _private_key(create=True, passphrase="correct horse battery")
+    with open(KEY_FILE, "rb") as f:
+        on_disk = f.read()
+    c6 = card("ella", "d6", "a@b.com", "S6", "B6")
+    c = _load()[c6]
+    c["thumbed_at"] = time.time()
+    c["sig"] = _sign(priv, _message(c6, c), "correct horse battery")
+    checks.append(("off macOS the key file is encrypted and private", b"ENCRYPTED PRIVATE KEY" in on_disk
+                   and oct(os.stat(KEY_FILE).st_mode & 0o777) == "0o600" and _private_key() == on_disk))
+    checks.append(("it signs with the passphrase", _signature_ok(c6, c)))
+    checks.append(("a wrong or missing passphrase signs nothing", _sign(priv, b"m", "wrong guess") == ""
+                   and _sign(priv, b"m") == "" and _private_key(create=True) == on_disk))
+    (KEY_DIR, KEY_FILE, PUB_FILE), _on_keychain = saved_paths, saved_keychain
     bad = [n for n, ok in checks if not ok]
     for n in bad:
         print("FAIL", n)

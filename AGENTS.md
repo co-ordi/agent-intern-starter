@@ -13,10 +13,12 @@ the tests that try to get round the sign-off). Then tell the person what you fou
 two each, and say so plainly if a point doesn't hold.
 
 - **Where it writes.** Inside this folder: the interns' files, `team/team.json`, `team/inbox/`, `team/status/`,
-  `team/logs/` and small launchers in `bin/`. Outside it, only two things. The sign-off key, made the first time they
-  approve a card from the terminal: on macOS the private key goes in their keychain with no trusted apps (so every
-  read asks for their Mac password) and the public half in `~/.config/agent-interns/signoff.pub`; elsewhere both are
-  files in that folder, readable only by them. And, only if they connect a bank, its tokens in
+  `team/logs/` and small launchers in `bin/`. It also makes `team/bin/` and every `agents/*/.claude/settings*.json`
+  read-only (`chmod a-w`), so no intern can change the guard; `install.py --unlock`, in their own terminal, undoes
+  it. Outside this folder, only two things. The sign-off key, made the first time they approve a card from the
+  terminal: on macOS the private key goes in their keychain with no trusted apps (so every read asks for their Mac
+  password) and the public half in `~/.config/agent-interns/signoff.pub`; elsewhere both are files in that folder,
+  readable only by them, and the private key is encrypted with a passphrase they choose. And, only if they connect a bank, its tokens in
   `~/.config/agent-interns/` or the keychain.
 - **What leaves the computer.** Only two scripts make network calls, and only once the person has set them up:
   `team/bin/slack.py` (posts to their own private Slack channel) and `agents/arthur/tools/truelayer.py` (reads bank
@@ -38,8 +40,14 @@ Then give them the known limits, in your own words:
   could still reach what they can. For hard isolation, run the interns under a separate OS user or in a container.
 - On macOS, the terminal sign-off asks for their Mac password before it signs. They should click "Allow", never
   "Always Allow": "Always Allow" trusts the `security` tool for good, and then an intern could read the key too.
-- Off macOS, the private key is a file. A file readable by their user is readable by any agent running as them, so
-  there the guard is the only thing between an intern and that key.
+- Off macOS, the private key is a file encrypted with their passphrase (AES-256), typed at each sign-off. An agent
+  running as them can read the file but can't sign with it; a weak passphrase could be guessed offline, so they
+  should use four random words or more.
+- The guard is pattern matching. It blocks the routes it knows, and checks what interns write as well as what they
+  run, but deliberately disguised code can still get past it. The read-only guard and settings and the signed
+  sign-offs are the backstop, and only a separate OS user or a container gives hard isolation.
+- Each intern's `.claude/` folder stays writable, so their AI tool can save their own permission choices. Disguised
+  code could add a settings file there; the guard blocks every plain route to it.
 - The public key file decides which signatures count. An intern running as them could in principle swap it; the
   guard blocks writes to that folder, but only a separate OS user makes it impossible.
 - Tool names are matched after lower-casing and removing separators, so `sendMail`, `send-email` and `send_email`

@@ -7,6 +7,20 @@ description: 🧭 Theo · Day one: interview the human (about a dozen plain ques
 
 Run this on day one (when `../../team/team.json` has no `"onboarded"` date) or whenever the human asks to set up the team again. It takes about ten minutes. You're fitting four interns to one business, so listen more than you talk.
 
+## First: the whole team, or one intern?
+
+Before the questions, ask: "Do you want the whole team from day one, or to start with one intern for a week and add
+the others once it's earned its place? Ella (sales) or Arthur (money) are the easiest to judge in a week; Chris
+(marketing) works too." Either answer is fine; say so.
+
+- **The whole team:** run everything below. If `../../team/team.json` has an `"active"` list, remove it.
+- **One intern:** still run the interview, but ask only the questions that intern needs (everyone: 1, 2, 8, 9;
+  sales: 3, 4, 5, 6, 7, 12; marketing: 6, 7, 10; finance: 5, 11) and connect only its tools. Set `"active"` in
+  `../../team/team.json` to a list with that intern's folder name, e.g. `["ella"]`: scheduled runs then skip the
+  others. They run it by hand for a week, no scheduling.
+- **Adding the others later** (they open you and say "add the team", or name an intern): ask the questions you
+  skipped, connect those interns' tools, then add them to `"active"`, or remove the list when everyone's on.
+
 ## The interview
 
 Ask one question at a time, in plain words, and wait for the answer. Skip any question the human already answered. If they say "skip", leave it and move on.
@@ -63,6 +77,25 @@ contacts or deals, accounting, bank. For each one:
 Never put a key or token in a file here: keys go in their keychain or the AI tool's own config. Skipping is fine:
 every intern still works from exports, and `docs/connect-tools.md` has the table for later.
 
-Finish with three lines: what you set up, the one thing still missing (a tool to connect, a number to decide), and what happens tomorrow morning. One line in `memory/log.md`.
+## Finish: how your team works
+
+End with this, filled in from what you set up, on one screen. Write for someone who has never used a terminal: no
+jargon, no file you haven't explained. Its paths are from the repo root, where they work. Then one line in
+`memory/log.md`.
+
+> **How your team works**
+> - **Talk to any of them:** in a terminal in this folder, `python3 team/bin/open.py <name>` (theo, ella, chris or
+>   arthur). Each one starts already up to speed: its memory, today's team notes and any orders load by themselves.
+> - **Your morning report:** from me at <time> on weekdays, in `team/inbox/<date>/report.md` (and <channel>, if
+>   wired). Drafts go to <their email's drafts folder>, each with a card in `team/inbox/<date>/cards.md` (or <channel>).
+> - **Signing off:** a 👍 on the card, or `python3 team/bin/approvals.py approve --card <id>` in your own terminal,
+>   then two minutes to change your mind. Nothing leaves without that sign-off. Before scheduling is on, the send
+>   needs you too: open me and say "send it", or send the draft from your email yourself.
+> - **On their own:** once scheduling is on, <who runs when, one short line from the schedule>. Switch it on with
+>   the lines under "Running on their own" in the README. Until then, they work when you open them.
+> - **Set up:** <tools connected>. **Still missing:** <the one thing>. **Tomorrow morning:** <what happens>.
+
+If they started with one intern, swap the report and "on their own" lines for one: "**Each morning:** open <name>
+and say <its routine, e.g. /today or /books>. When it's earning its place, open me and say 'add the team'."
 
 You never write the human's passwords or keys anywhere; if they paste one, say so and tell them to keep it in their keychain instead.

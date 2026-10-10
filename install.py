@@ -12,6 +12,10 @@ What it does:
   4. Puts a small launcher for each intern in bin/ (`bin/theo` opens the head intern, like team/bin/open.py theo).
   5. Keeps your interns' memory and working files out of git: checks .gitignore has the rules (adding any that are
      missing) and marks the memory files so git leaves them alone. Nothing for you to set up.
+  6. Locks the guard and the interns' settings: team/bin/ (the folder and its files) and every
+     agents/*/.claude/settings*.json become read-only at the OS level (chmod a-w), so not even code an intern writes
+     can change them. To edit them yourself, or to git pull an update, run `python3 install.py --unlock` in your own
+     terminal; running install.py again (or --lock) locks them again.
 
 Then: `python3 team/bin/open.py theo`, and the head intern runs a short interview to fit the team to your business.
 
@@ -24,6 +28,8 @@ Usage:  python3 install.py                 three questions
                                            e.g. {"owner": "Sam", "business": "...", "goal": "...", "names": ["Theo", ...]},
                                            so no shell ever reads your words
         python3 install.py --dry-run       show what would change
+        python3 install.py --unlock        let you edit team/bin/ and the interns' settings (your own terminal only)
+        python3 install.py --lock          make them read-only again (any install run does this too)
         python3 install.py --help          this help (installs nothing)"""
 import json
 import os
@@ -37,6 +43,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 AGENTS = os.path.join(ROOT, "agents")
 TEAM = os.path.join(ROOT, "team")
 CONFIG = os.path.join(TEAM, "team.json")
+# The markers an AI coding tool or a scheduled run sets: --unlock refuses under any of them.
+AI_MARKERS = ("TEAM_AGENT", "TEAM_RUN", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX", "CODEX_MANAGED_BY_NPM",
+              "GEMINI_CLI", "CURSOR_TRACE_ID")
 DEFAULT_NAMES = {"orchestrator": "Theo", "sales": "Ella", "marketing": "Chris", "finance": "Arthur"}
 ROLE_ORDER = ["orchestrator", "sales", "marketing", "finance"]
 ROLE_TITLE = {"orchestrator": "head intern, orchestrator", "sales": "sales", "marketing": "marketing", "finance": "finance"}
@@ -208,12 +217,14 @@ def apply(answers, names, dry=False):
            "runner": answers.get("runner", RUNNERS["claude"]),
            "owner": {"name": answers["owner"], "business": answers["business"], "goal": answers["goal"],
                      "bigger_pieces": answers.get("bigger_pieces", "")}, "agents": {}}
-    for k in ("slack_channel", "slack_owner", "onboarded", "allow"):  # set later; a re-run keeps them
+    for k in ("slack_channel", "slack_owner", "onboarded", "allow", "active"):  # set later; a re-run keeps them
         if prev.get(k):
             cfg[k] = prev[k]
     if "--onboarded" in sys.argv:
         import datetime
         cfg["onboarded"] = datetime.date.today().isoformat()
+    if not dry:
+        set_locked(False)   # the settings files get filled in too; everything is locked again below
     for kind, a, b in steps:
         if kind == "rename":
             print(f"rename agents/{a} -> agents/{b}")
@@ -270,9 +281,16 @@ def apply(answers, names, dry=False):
     launchers(cfg)
     ensure_gitignore()
     protect_memory(cfg)
+    set_locked(True)
     print(f"\nDone. Next: python3 team/bin/open.py {slug(names['orchestrator'])}")
     print(f"The head intern interviews you for ten minutes and fits the team to your business"
           + (", starting with the goal." if not answers.get("goal") else "."))
+    print("Your first day, step by step: docs/first-day.md")
+    print("Locked: the guard (team/bin/) and the interns' settings are read-only, so no intern can change them. "
+          "To edit them yourself: python3 install.py --unlock")
+    if sys.platform != "darwin":
+        print("Sign-offs: your first one asks you to choose a passphrase. It locks the signing key, and you type it "
+              "at every sign-off.")
     if not shutil.which(cfg["tool"]):
         print(f"Note: `{cfg['tool']}` isn't on your PATH yet. Install your AI coding tool, then the interns can start.")
 
@@ -325,6 +343,40 @@ def ensure_gitignore(path=None):
     return missing
 
 
+def protected_paths(root=None):
+    """What no intern may change: the team/bin/ folder, its files, and every agents/*/.claude/settings*.json."""
+    root = root or ROOT
+    bin_dir = os.path.join(root, "team", "bin")
+    files = [os.path.join(bin_dir, f) for f in sorted(os.listdir(bin_dir))
+             if os.path.isfile(os.path.join(bin_dir, f))] if os.path.isdir(bin_dir) else []
+    agents = os.path.join(root, "agents")
+    for a in sorted(os.listdir(agents)) if os.path.isdir(agents) else []:
+        d = os.path.join(agents, a, ".claude")
+        if os.path.isdir(d):
+            files += [os.path.join(d, f) for f in sorted(os.listdir(d)) if re.fullmatch(r"settings[\w.-]*\.json", f)]
+    return bin_dir, files
+
+
+def set_locked(locked, root=None):
+    """Read-only at the OS level (chmod a-w) or writable again for you. The team/bin/ folder is locked too, so
+    nothing in it can be renamed, deleted or added; its __pycache__ goes first, so no stale bytecode stands in for
+    the guard. Returns the paths it changed."""
+    bin_dir, files = protected_paths(root)
+    if not os.path.isdir(bin_dir):
+        return []
+    no_write = ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+    if locked:
+        shutil.rmtree(os.path.join(bin_dir, "__pycache__"), ignore_errors=True)
+    else:
+        os.chmod(bin_dir, os.stat(bin_dir).st_mode | stat.S_IWUSR)
+    for p in files:
+        mode = os.stat(p).st_mode
+        os.chmod(p, mode & no_write if locked else mode | stat.S_IWUSR)
+    if locked:
+        os.chmod(bin_dir, os.stat(bin_dir).st_mode & no_write)
+    return files + [bin_dir]
+
+
 def protect_memory(cfg):
     """Tell git to ignore local changes to the memory templates, so an intern's memory never ends up in a commit."""
     if not os.path.isdir(os.path.join(ROOT, ".git")):
@@ -339,8 +391,24 @@ if __name__ == "__main__":
     if "-h" in sys.argv or "--help" in sys.argv:
         print(__doc__)
         sys.exit(0)
+    if "--unlock" in sys.argv:
+        if any(os.environ.get(k) for k in AI_MARKERS):
+            print("Refused: unlock in your own terminal, not inside an AI tool. Changing the guard is yours alone.")
+            sys.exit(1)
+        set_locked(False)
+        print("Unlocked: you can edit team/bin/ and the interns' .claude/settings*.json, or git pull an update. "
+              "Lock them again with python3 install.py --lock (any install run locks them too).")
+        sys.exit(0)
+    if "--lock" in sys.argv:
+        set_locked(True)
+        print("Locked: team/bin/ and the interns' settings are read-only again.")
+        sys.exit(0)
     sys.argv = with_answers(sys.argv)
     dry = "--dry-run" in sys.argv
     quiet = dry or "--yes" in sys.argv or "--defaults" in sys.argv or not sys.stdin.isatty()
     a, n = gather(sys.argv, ask_questions=not quiet)
-    apply(a, n, dry=dry)
+    try:
+        apply(a, n, dry=dry)
+    finally:
+        if not dry:
+            set_locked(True)   # even if something failed half way

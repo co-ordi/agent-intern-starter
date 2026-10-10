@@ -25,7 +25,8 @@ python3 team/bin/open.py theo
 On first open he interviews you: about a dozen plain questions, one at a time, about what you sell, your goal, your
 deals, your tools, how you write and what must never happen. He shows you a summary, and once you say yes he fits
 every intern to your business. What he learns goes into the interns' memory files, plain text you can open and read
-in a minute.
+in a minute. He asks first whether you want the whole team or one intern to start with; one is fine (see "Start with
+one intern" in the README).
 
 ## 3. Your first morning report (2 minutes)
 
